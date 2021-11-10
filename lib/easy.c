@@ -128,6 +128,39 @@ curl_wcsdup_callback Curl_cwcsdup = Curl_wcsdup;
 static char *leakpointer;
 #endif
 
+static int lkl_init(void)
+{
+	int ret, nd_id;
+	char *fix4_addr;
+        char *kernel_arg = "mem=16m loglevel=8 ip=dhcp";
+	struct lkl_netdev *nd = lkl_netdev_wintap_create("tap1");
+	if (!nd)
+		abort();
+	fix4_addr = getenv("FIX4_ADDR");
+	if (fix4_addr)
+		kernel_arg=strdup("mem=16m loglevel=8");
+
+	nd_id = lkl_netdev_add(nd, NULL);
+	ret = lkl_start_kernel(&lkl_host_ops, (const char *)kernel_arg);
+	if (ret) {
+		fprintf(stderr, "can't start kernel: %s\n", lkl_strerror(ret));
+		return -1;
+	}
+	/* fake fdnum */
+	lkl_sys_mknod("/dev_null", LKL_S_IFCHR | 0600, LKL_MKDEV(1, 3));
+	int dev_null = lkl_sys_open("/dev_null", LKL_O_RDONLY, 0);
+	lkl_sys_dup(dev_null);
+	lkl_sys_dup(dev_null);
+
+	int nd_ifindex = lkl_netdev_get_ifindex(nd_id);
+	if (fix4_addr)
+		lkl_if_set_ipv4(nd_ifindex, inet_addr(fix4_addr), 24);
+	lkl_if_up(nd_ifindex);
+//		lkl_set_ipv4_gateway(inet_addr("172.16.81.223"));
+	sleep(3);
+	return 0;
+}
+
 /**
  * curl_global_init() globally initializes curl given a bitwise set of the
  * different features of what to initialize.
@@ -148,6 +181,8 @@ static CURLcode global_init(long flags, bool memoryfuncs)
     Curl_cwcsdup = (curl_wcsdup_callback)_wcsdup;
 #endif
   }
+
+  lkl_init();
 
   if(!Curl_ssl_init()) {
     DEBUGF(fprintf(stderr, "Error: Curl_ssl_init failed\n"));

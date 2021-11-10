@@ -1,0 +1,175 @@
+name: CI
+on:
+  push:
+    branches:
+      - master
+      - '**'
+    tags:
+      - 'milestone-*'
+  pull_request:
+    branches:
+      - master
+      - 'release/**'
+
+jobs:
+  #
+  # Build/tests
+  #
+  integration:
+    name: Integration test
+    runs-on: ${{ matrix.runs_on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - displayTargetName: windows-2019
+            os: windows
+            runs_on: windows-2019
+            shell: msys2 {0}
+    timeout-minutes: 100
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      USE_CCACHE: 1
+
+    defaults:
+       run:
+         shell: ${{ matrix.shell }}
+
+    steps:
+      - name: Set env
+        shell: bash
+        run: |
+          echo "/usr/lib/ccache/bin:/usr/lib/ccache:/mingw64/bin:${{ github.workspace }}/bin" >> $GITHUB_PATH
+          echo "export PATH=/usr/lib/ccache/bin:/usr/lib/ccache:/mingw64/bin:${{ github.workspace }}/bin:$PATH" >> $HOME/.bashrc
+
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: MSYS
+          path-type: minimal
+          update: true
+          install: >-
+            base-devel
+            gcc
+            git
+            unzip
+            openssl-devel
+            python
+            mingw-w64-x86_64-ccache
+
+      - uses: actions/cache@v2
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ runner.os }}-ccache-build-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-ccache-build-
+
+      - name: Fix broken msys2 ccache
+        run: |
+          mkdir -p /usr/lib/ccache/bin
+          cd /usr/lib/ccache/bin
+          echo -e '#!/bin/bash\n\nccache /usr/bin/cc "$@"' > cc
+          echo -e '#!/bin/bash\n\nccache /usr/bin/gcc "$@"' > gcc
+          echo -e '#!/bin/bash\n\nccache /usr/bin/cpp "$@"' > cpp
+          export PATH=/usr/lib/ccache/bin:/usr/lib/ccache:/mingw64/bin:$PATH
+          which gcc
+          ccache -z
+
+      - name: Install openvpn
+        shell: msys2 {0}
+        run: |
+          curl -L -O https://swupdate.openvpn.org/community/releases/OpenVPN-2.5.3-I601-amd64.msi
+          cmd.exe /c "start /wait msiexec /i OpenVPN-2.5.3-I601-amd64.msi ADDLOCAL=OpenVPN,Drivers.TAPWindows6,Drivers /qn /l*v c:\\msilog.txt"
+
+      - name: Install Wireshark
+        shell: cmd
+        run: |
+          curl -L -O https://1.as.dl.wireshark.org/win64/all-versions/Wireshark-win64-3.4.9.exe
+          Wireshark-win64-3.4.9.exe /NCRC /S /desktopicon=yes /quicklaunchicon=no
+
+
+#- name: Setup tmate session
+# uses: mxschmitt/action-tmate@v3
+
+      - uses: actions/checkout@v2
+
+      - name: build curl
+        run: |
+          curl -L -O https://github.com/ngi-mptcp/lkl-next/releases/download/milestone-3/liblkl.a
+          mkdir lkl
+          cd lkl
+          curl -L -O https://github.com/ngi-mptcp/lkl-next/releases/download/milestone-3/include.zip
+          unzip include.zip || true
+          cd ..
+          ./buildconf
+          ./configure --with-openssl
+          make
+
+      - name: packet capture on
+        run: |
+          pktmon list
+          pktmon start --capture --comp 1
+
+      - name: run tests
+        run: |
+          netsh interface ip set address "OpenVPN TAP-Windows6" static 10.0.0.1 255.255.255.0 0.0.0.0
+          netsh advfirewall set allprofiles state off
+          python -m http.server 8080 &
+          #./src/curl.exe multipath-tcp.org --resolve multipath-tcp.org:80:130.104.228.140
+          FIX4_ADDR=10.0.0.2 ./src/curl.exe 10.0.0.1:8080
+
+      - name: packet capture off
+        run: |
+          pktmon stop
+          pktmon etl2pcap PktMon.etl
+          /c/'Program Files'/Wireshark/tshark -r PktMon.pcapng -n > mptcp-pcapng.txt
+ 
+      - name: pcap contents dump
+        run: |
+          PCAPT=$(cat mptcp-pcapng.txt | sed -z "s/\]//g"| sed -z "s/\"//g" |sed -z "s/\\n/\\\\n/g")
+          JSON=$(cat << EOF
+          [
+            {
+              "file": "mptcp-pcapng.txt",
+              "line": 1,
+              "title": "pcap contents",
+              "message": "$PCAPT",
+              "annotation_level": "notice"
+            }
+          ]
+          EOF
+          )
+          echo $JSON > ./annotations.json
+          cat ./annotations.json
+
+#      - name: Setup tmate session
+#        uses: mxschmitt/action-tmate@v3
+
+      - name: ccache stat
+        run: |
+          export PATH=/usr/lib/ccache/bin:/usr/lib/ccache:/mingw64/bin:$PATH
+          ccache --show-stats
+
+      - name: Archive test resuls pcap
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+           path: |
+             ${{ github.workspace }}/PktMon.pcapng
+             ${{ github.workspace }}/src/curl.exe
+
+      - name: Annotate
+        uses: yuzutech/annotations-action@v0.3.0
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          input: "${{ github.workspace }}/annotations.json"
+          title: "pcap mptcp"
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            ${{ github.workspace }}/PktMon.pcapng
+            ${{ github.workspace }}/src/curl.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

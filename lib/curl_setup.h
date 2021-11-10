@@ -842,4 +842,7 @@ int getpwuid_r(uid_t uid, struct passwd *pwd, char *buf,
 #  endif
 #endif
 
+#include <lkl.h>
+#include <lkl_host.h>
+
 #endif /* HEADER_CURL_SETUP_H */

@@ -248,7 +248,7 @@ int Curl_socket_check(curl_socket_t readfd0, /* two sockets to read from */
                       curl_socket_t writefd, /* socket to write to */
                       timediff_t timeout_ms) /* milliseconds to wait */
 {
-  struct pollfd pfd[3];
+  struct lkl_pollfd pfd[3];
   int num;
   int r;
 
@@ -326,7 +326,7 @@ int Curl_socket_check(curl_socket_t readfd0, /* two sockets to read from */
  *    0 = timeout
  *    N = number of structures with non zero revent fields
  */
-int Curl_poll(struct pollfd ufds[], unsigned int nfds, timediff_t timeout_ms)
+int Curl_poll(struct lkl_pollfd ufds[], unsigned int nfds, timediff_t timeout_ms)
 {
 #ifdef HAVE_POLL_FINE
   int pending_ms;
@@ -371,7 +371,7 @@ int Curl_poll(struct pollfd ufds[], unsigned int nfds, timediff_t timeout_ms)
     pending_ms = -1;
   else
     pending_ms = 0;
-  r = poll(ufds, nfds, pending_ms);
+  r = lkl_sys_poll(ufds, nfds, pending_ms);
   if(r <= 0)
     return r;
 

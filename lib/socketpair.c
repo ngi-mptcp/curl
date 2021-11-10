@@ -72,7 +72,7 @@ int Curl_socketpair(int domain, int type, int protocol,
   (void)type;
   (void)protocol;
 
-  listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  listener = lkl_sys_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if(listener == CURL_SOCKET_BAD)
     return -1;
 
@@ -83,20 +83,20 @@ int Curl_socketpair(int domain, int type, int protocol,
 
   socks[0] = socks[1] = CURL_SOCKET_BAD;
 
-  if(setsockopt(listener, SOL_SOCKET, SO_REUSEADDR,
+  if(lkl_sys_setsockopt(listener, SOL_SOCKET, SO_REUSEADDR,
                 (char *)&reuse, (curl_socklen_t)sizeof(reuse)) == -1)
     goto error;
-  if(bind(listener, &a.addr, sizeof(a.inaddr)) == -1)
+  if(lkl_sys_bind(listener, &a.addr, sizeof(a.inaddr)) == -1)
     goto error;
-  if(getsockname(listener, &a.addr, &addrlen) == -1 ||
+  if(lkl_sys_getsockname(listener, &a.addr, &addrlen) == -1 ||
      addrlen < (int)sizeof(a.inaddr))
     goto error;
-  if(listen(listener, 1) == -1)
+  if(lkl_sys_listen(listener, 1) == -1)
     goto error;
-  socks[0] = socket(AF_INET, SOCK_STREAM, 0);
+  socks[0] = lkl_sys_socket(AF_INET, SOCK_STREAM, 0);
   if(socks[0] == CURL_SOCKET_BAD)
     goto error;
-  if(connect(socks[0], &a.addr, sizeof(a.inaddr)) == -1)
+  if(lkl_sys_connect(socks[0], &a.addr, sizeof(a.inaddr)) == -1)
     goto error;
 
   /* use non-blocking accept to make sure we don't block forever */
@@ -106,17 +106,17 @@ int Curl_socketpair(int domain, int type, int protocol,
   pfd[0].events = POLLIN;
   pfd[0].revents = 0;
   (void)Curl_poll(pfd, 1, 10*1000); /* 10 seconds */
-  socks[1] = accept(listener, NULL, NULL);
+  socks[1] = lkl_sys_accept(listener, NULL, NULL);
   if(socks[1] == CURL_SOCKET_BAD)
     goto error;
 
   /* verify that nothing else connected */
   addrlen = sizeof(a.inaddr);
-  if(getsockname(socks[0], &a.addr, &addrlen) == -1 ||
+  if(lkl_sys_getsockname(socks[0], &a.addr, &addrlen) == -1 ||
      addrlen < (int)sizeof(a.inaddr))
     goto error;
   addrlen = sizeof(a2.inaddr);
-  if(getpeername(socks[1], &a2.addr, &addrlen) == -1 ||
+  if(lkl_sys_getpeername(socks[1], &a2.addr, &addrlen) == -1 ||
      addrlen < (int)sizeof(a2.inaddr))
     goto error;
   if(a.inaddr.sin_family != a2.inaddr.sin_family ||

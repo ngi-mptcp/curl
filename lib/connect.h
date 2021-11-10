@@ -100,7 +100,7 @@ struct Curl_sockaddr_ex {
   int protocol;
   unsigned int addrlen;
   union {
-    struct sockaddr addr;
+    struct lkl_sockaddr addr;
     struct Curl_sockaddr_storage buff;
   } _sa_ex_u;
 };

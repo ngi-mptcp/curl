@@ -113,7 +113,7 @@ struct timeval {
  */
 
 #ifdef HAVE_MSG_NOSIGNAL
-#define SEND_4TH_ARG MSG_NOSIGNAL
+#define SEND_4TH_ARG 0x4000
 #else
 #define SEND_4TH_ARG 0
 #endif
@@ -157,7 +157,7 @@ struct timeval {
   Error Missing_definition_of_return_and_arguments_types_of_recv
   /* */
 #else
-#define sread(x,y,z) (ssize_t)recv((RECV_TYPE_ARG1)(x), \
+#define sread(x,y,z) (ssize_t)lkl_sys_recv((RECV_TYPE_ARG1)(x), \
                                    (RECV_TYPE_ARG2)(y), \
                                    (RECV_TYPE_ARG3)(z), \
                                    (RECV_TYPE_ARG4)(0))
@@ -188,8 +188,8 @@ struct timeval {
   Error Missing_definition_of_return_and_arguments_types_of_send
   /* */
 #else
-#define swrite(x,y,z) (ssize_t)send((SEND_TYPE_ARG1)(x), \
-                                    (SEND_QUAL_ARG2 SEND_TYPE_ARG2)(y), \
+#define swrite(x,y,z) (ssize_t)lkl_sys_send((SEND_TYPE_ARG1)(x), \
+                                    (SEND_TYPE_ARG2)(y), \
                                     (SEND_TYPE_ARG3)(z), \
                                     (SEND_TYPE_ARG4)(SEND_4TH_ARG))
 #endif
@@ -255,7 +255,7 @@ struct timeval {
 #elif defined(USE_LWIPSOCK)
 #  define sclose(x)  lwip_close((x))
 #else
-#  define sclose(x)  close((x))
+#  define sclose(x)  lkl_sys_close((x))
 #endif
 
 /*
@@ -264,7 +264,7 @@ struct timeval {
 #if defined(USE_LWIPSOCK)
 #  define sfcntl  lwip_fcntl
 #else
-#  define sfcntl  fcntl
+#  define sfcntl  lkl_sys_fcntl
 #endif
 
 #define TOLOWER(x)  (tolower((int)  ((unsigned char)x)))

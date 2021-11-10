@@ -39,7 +39,8 @@ AM_CPPFLAGS = -I$(top_srcdir)/include        \
               -I$(top_builddir)/lib          \
               -I$(top_builddir)/src          \
               -I$(top_srcdir)/lib            \
-              -I$(top_srcdir)/src
+              -I$(top_srcdir)/src            \
+              -I$(top_srcdir)/lkl/include
 
 bin_PROGRAMS = curl
 
@@ -58,12 +59,12 @@ curl_SOURCES = $(CURL_FILES)
 CFLAGS += @CURL_CFLAG_EXTRAS@
 
 # Prevent LIBS from being used for all link targets
-LIBS = $(BLANK_AT_MAKETIME)
+LIBS = $(BLANK_AT_MAKETIME) -Wl,--image-base -Wl,0x10000000 -Wl,--enable-auto-image-base -Wl,--export-all-symbols -Wl,--enable-auto-import -static
 
 if USE_EXPLICIT_LIB_DEPS
-curl_LDADD = $(top_builddir)/lib/libcurl.la @LIBCURL_LIBS@
+curl_LDADD = $(top_builddir)/lib/libcurl.la $(top_srcdir)/liblkl.a @LIBCURL_LIBS@
 else
-curl_LDADD = $(top_builddir)/lib/libcurl.la @NSS_LIBS@ @SSL_LIBS@ @ZLIB_LIBS@ @CURL_NETWORK_AND_TIME_LIBS@
+curl_LDADD = $(top_builddir)/lib/libcurl.la $(top_srcdir)/liblkl.a @NSS_LIBS@ @SSL_LIBS@ @ZLIB_LIBS@ @CURL_NETWORK_AND_TIME_LIBS@
 endif
 
 # if unit tests are enabled, build a static library to link them with

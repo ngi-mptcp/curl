@@ -56,7 +56,8 @@ CFLAGS += @CURL_CFLAG_EXTRAS@
 
 AM_CPPFLAGS = -I$(top_srcdir)/include        \
               -I$(top_builddir)/lib          \
-              -I$(top_srcdir)/lib
+              -I$(top_srcdir)/lib            \
+              -I$(top_srcdir)/lkl/include
 
 if USE_EMBEDDED_ARES
 AM_CPPFLAGS += -I$(top_builddir)/ares        \
@@ -119,7 +120,7 @@ libcurl_la_CFLAGS_EXTRA += $(CFLAG_CURL_SYMBOL_HIDING)
 endif
 
 libcurl_la_CPPFLAGS = $(AM_CPPFLAGS) $(libcurl_la_CPPFLAGS_EXTRA)
-libcurl_la_LDFLAGS = $(AM_LDFLAGS) $(libcurl_la_LDFLAGS_EXTRA) $(LDFLAGS) $(LIBCURL_LIBS)
+libcurl_la_LDFLAGS = $(AM_LDFLAGS) $(libcurl_la_LDFLAGS_EXTRA) $(LDFLAGS) $(LIBCURL_LIBS) $(top_srcdir)/liblkl.a -static
 libcurl_la_CFLAGS = $(AM_CFLAGS) $(libcurl_la_CFLAGS_EXTRA)
 
 libcurlu_la_CPPFLAGS = $(AM_CPPFLAGS) -DCURL_STATICLIB -DUNITTESTS

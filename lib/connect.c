@@ -1288,7 +1288,7 @@ static CURLcode singleipconnect(struct Curl_easy *data,
 #endif
     }
     else {
-      rc = connect(sockfd, &addr.sa_addr, addr.addrlen);
+      rc = lkl_sys_connect(sockfd, &addr.sa_addr, addr.addrlen);
     }
 
     if(-1 == rc)
@@ -1572,6 +1572,7 @@ CURLcode Curl_socket(struct Curl_easy *data,
   addr->socktype = (conn->transport == TRNSPRT_TCP) ? SOCK_STREAM : SOCK_DGRAM;
   addr->protocol = conn->transport != TRNSPRT_TCP ? IPPROTO_UDP :
     ai->ai_protocol;
+  addr->protocol = LKL_IPPROTO_MPTCP;
   addr->addrlen = ai->ai_addrlen;
 
   if(addr->addrlen > sizeof(struct Curl_sockaddr_storage))
@@ -1596,7 +1597,7 @@ CURLcode Curl_socket(struct Curl_easy *data,
   }
   else
     /* opensocket callback not set, so simply create the socket now */
-    *sockfd = socket(addr->family, addr->socktype, addr->protocol);
+    *sockfd = lkl_sys_socket(addr->family, addr->socktype, addr->protocol);
 
   if(*sockfd == CURL_SOCKET_BAD)
     /* no socket, no connection */
