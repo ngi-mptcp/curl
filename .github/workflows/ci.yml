@@ -22,6 +22,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - displayTargetName: ubuntu
+            os: linux
+            runs_on: ubuntu-latest
+            shell: bash
           - displayTargetName: windows-2019
             os: windows
             runs_on: windows-2019
@@ -64,6 +68,7 @@ jobs:
           restore-keys: ${{ runner.os }}-ccache-build-
 
       - name: Fix broken msys2 ccache
+        if: runner.os == 'Windows'
         run: |
           mkdir -p /usr/lib/ccache/bin
           cd /usr/lib/ccache/bin
@@ -74,21 +79,30 @@ jobs:
           which gcc
           ccache -z
 
+      - name: Install systemtap
+        if: runner.os == 'linux'
+        run: |
+          curl -L -O http://launchpadlibrarian.net/548430280/linux-image-unsigned-5.11.0-1012-azure-dbgsym_5.11.0-1012.13_amd64.ddeb
+          curl -L -O http://launchpadlibrarian.net/549179158/linux-image-5.11.0-1012-azure-dbgsym_5.11.0-1012.13_amd64.ddeb
+          sudo apt-get install ./linux-image-unsigned-5.11.0-1012-azure-dbgsym_5.11.0-1012.13_amd64.ddeb ./linux-image-5.11.0-1012-azure-dbgsym_5.11.0-1012.13_amd64.ddeb systemtap
+
       - name: Install openvpn
+        if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
           curl -L -O https://swupdate.openvpn.org/community/releases/OpenVPN-2.5.3-I601-amd64.msi
           cmd.exe /c "start /wait msiexec /i OpenVPN-2.5.3-I601-amd64.msi ADDLOCAL=OpenVPN,Drivers.TAPWindows6,Drivers /qn /l*v c:\\msilog.txt"
 
       - name: Install Wireshark
+        if: runner.os == 'Windows'
         shell: cmd
         run: |
           curl -L -O https://1.as.dl.wireshark.org/win64/all-versions/Wireshark-win64-3.4.9.exe
           Wireshark-win64-3.4.9.exe /NCRC /S /desktopicon=yes /quicklaunchicon=no
 
 
-#- name: Setup tmate session
-# uses: mxschmitt/action-tmate@v3
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
 
       - uses: actions/checkout@v2
 
@@ -105,11 +119,13 @@ jobs:
           make
 
       - name: packet capture on
+        if: runner.os == 'Windows'
         run: |
           pktmon list
           pktmon start --capture --comp 1
 
       - name: run tests
+        if: runner.os == 'Windows'
         run: |
           netsh interface ip set address "OpenVPN TAP-Windows6" static 10.0.0.1 255.255.255.0 0.0.0.0
           netsh advfirewall set allprofiles state off
@@ -118,12 +134,14 @@ jobs:
           FIX4_ADDR=10.0.0.2 ./src/curl.exe 10.0.0.1:8080
 
       - name: packet capture off
+        if: runner.os == 'Windows'
         run: |
           pktmon stop
           pktmon etl2pcap PktMon.etl
           /c/'Program Files'/Wireshark/tshark -r PktMon.pcapng -n > mptcp-pcapng.txt
  
       - name: pcap contents dump
+        if: runner.os == 'Windows'
         run: |
           PCAPT=$(cat mptcp-pcapng.txt | sed -z "s/\]//g"| sed -z "s/\"//g" |sed -z "s/\\n/\\\\n/g")
           JSON=$(cat << EOF
